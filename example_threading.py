@@ -5,6 +5,7 @@ Generates various samples of threading samples into an ARG, rendering image
 of ARG and overlaying code at each stage.
 """
 import arg_needle_lib
+import bpy
 
 from arg_to_blender import ArgToBlender
 from pathlib import Path
@@ -24,8 +25,12 @@ class ArgOps:
 
 Path("example_out").mkdir(exist_ok=True)
 
+# Fix render output resolution for consistent results
+bpy.context.scene.render.resolution_x = 800
+bpy.context.scene.render.resolution_y = 600
+
 # Use system font in Pillow for text rendering
-font = ImageFont.load_default(24)
+font = ImageFont.load_default(12)
 
 # Example threading operations
 threading_examples = [
@@ -82,6 +87,6 @@ for ex in threading_examples:
         # Overlay source code
         img = Image.open(filename)
         draw = ImageDraw.Draw(img)
-        text_pos = (img.width - 600, img.height - 250)
+        text_pos = (img.width - 300, img.height - 160)
         draw.text(text_pos, full_code_text, (127, 127, 127), font=font)
         img.save(filename)
