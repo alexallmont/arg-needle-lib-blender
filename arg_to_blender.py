@@ -16,7 +16,9 @@ class ArgToBlender:
         render_text = True,
         render_breakpoints = False,
         global_scale = 10,
-        text_scale = 0.5
+        text_scale = 0.5,
+        camera_location = None,
+        camera_look_at = None
     ):
         self.render_info = ArgRenderInfo(arg, global_scale)
 
@@ -29,7 +31,7 @@ class ArgToBlender:
         if render_breakpoints:
             self._add_breakpoints_to_scene(render_text, text_scale)
 
-        self._create_camera()
+        self._create_camera(camera_location, camera_look_at)
         if blender_out_file:
             self._save_blender_file(blender_out_file)
 
@@ -136,19 +138,19 @@ class ArgToBlender:
             bpy.context.object.name = f"breakpoint_text_{breakpoint}"
             bpy.context.object.data.body = str(breakpoint)
 
-    def _create_camera(self):
+    def _create_camera(self, camera_location, camera_look_at):
         ri = self.render_info
         cam = bpy.data.cameras.new("Camera")
         cam.lens = 30
         cam_obj = bpy.data.objects.new("Camera", cam)
-        cam_obj.location = (
+        cam_obj.location = camera_location or (
             ri.max_width * 3 * ri.x_scale,
             -ri.max_len * 0.3 * ri.len_scale,
             ri.max_height * 1.5 * ri.height_scale
         )
         bpy.context.scene.collection.objects.link(cam_obj)
 
-        target = mathutils.Vector((
+        target = mathutils.Vector(camera_look_at or (
             0,
             ri.max_len * 0.3 * ri.len_scale,
             ri.max_height * 0.3 * ri.height_scale
@@ -178,10 +180,7 @@ class ArgToBlender:
 
     @staticmethod
     def _clear_default_scene_objects():
-        # Clear any meshes and cameras, keep lights
-        bpy.ops.object.select_all(action='DESELECT')
-        bpy.ops.object.select_by_type(type == 'MESH')
-        bpy.ops.object.select_by_type(type == 'CAMERA')
+        bpy.ops.object.select_all(action='SELECT')
         bpy.ops.object.delete()
 
     @staticmethod

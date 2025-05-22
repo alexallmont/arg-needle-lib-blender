@@ -1,6 +1,9 @@
 import arg_needle_lib
 
 from arg_to_blender import ArgToBlender
+from pathlib import Path
+
+Path("example_out").mkdir(exist_ok=True)
 
 op_arg_n = [1, 2, 2, 3, 3]
 ops = [
@@ -13,11 +16,16 @@ ops = [
 
 for num_ops in range(len(ops)):
     arg_n = op_arg_n[num_ops]
-    print(arg_n)
+    print(f"Frame {arg_n}")
     arg = arg_needle_lib.ARG(0, 100, arg_n)
     for i in range(num_ops + 1):
         ops[i](arg)
     arg.populate_children_and_roots()
     ts = arg_needle_lib.arg_to_tskit(arg)
 
-    ArgToBlender(arg, png_out_file=f"example_threading_{num_ops}.png")
+    ArgToBlender(
+        arg,
+        png_out_file=f"example_out/threading_{num_ops}.png",
+        camera_location=(17, -5, 8),
+        camera_look_at=(0, 9, 3)
+    )
