@@ -1,6 +1,6 @@
 # Ignore generated blender files and images
-example.blend*
-example.png
+*.blend*
+*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
