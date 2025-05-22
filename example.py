@@ -15,7 +15,8 @@ X_SCALE = 8
 Y_SCALE = 0.001
 LEN_SCALE = 0.1
 NODE_COLOUR = (0.5, 1.0, 0.5, 0.5)
-EDGE_COLOUR = (0.3, 0.3, 1.0, 0.3)
+SAMPLE_COLOUR = (0.1, 0.1, 1.0, 1.0)
+EDGE_COLOUR = (0.1, 0.1, 1.0, 0.3)
 HALF_PI = math.pi / 2
 SHOW_TEXT = True
 
@@ -54,8 +55,8 @@ def arg_from_sim(sim: Sim):
     arg.populate_mutations_on_edges()
     return arg
 
-sim_1000_3 = Sim(3, 1_000, 10_000, 2e-7, 1e-7)
-arg = arg_from_sim(sim_1000_3)
+sim_1000 = Sim(3, 1_000, 10_000, 2e-7, 2e-7)
+arg = arg_from_sim(sim_1000)
 
 node_children = {}
 leaf_nodes = []
@@ -147,20 +148,22 @@ for id, x_h in node_x_and_height.items():
 
     material = bpy.data.materials.new(name+"_material")
     material.diffuse_color = NODE_COLOUR
+    if arg.is_leaf(id):
+        material.diffuse_color = SAMPLE_COLOUR
     curvedata.materials.append(material)
     curvedata.bevel_depth = 0.1
 
     if SHOW_TEXT:
-        bpy.ops.object.text_add(location=(x, s - 3, h), rotation=(0, 0, 0))
+        bpy.ops.object.text_add(location=(x, s - 1, h), rotation=(0, 0, 0))
         bpy.context.object.name = f"id_{id}"
         bpy.context.object.data.body = str(id)
 
-        bpy.ops.object.text_add(location=(x, e + 3, h), rotation=(0, 0, 2 * HALF_PI))
+        bpy.ops.object.text_add(location=(x, e + 1, h), rotation=(0, 0, 2 * HALF_PI))
         bpy.context.object.name = f"height_{id}"
         bpy.context.object.data.body = f"{node.height:.3f}"
 
 
-colour_tweak_scale = arg.num_nodes() * 2
+colour_tweak_scale = arg.num_nodes() * 4
 
 def recurse_create_edges(node):
     for edge in node.parent_edges():
@@ -188,14 +191,17 @@ def recurse_create_edges(node):
         #create new material with name of object and assign to obj
         new_mat = bpy.data.materials.new(obj_name)
         edge_colour = [EDGE_COLOUR[i] for i in range(4)]
-        edge_colour[0] += edge.parent.ID / colour_tweak_scale
-        edge_colour[1] += node.ID / colour_tweak_scale
+        if not arg.is_leaf(node.ID):
+            edge_colour[0] += node.ID / colour_tweak_scale
+            edge_colour[3] = 0.05
         new_mat.diffuse_color = edge_colour
         obj.data.materials.append(new_mat)
 
         if SHOW_TEXT:
-            mid_x = (x1 + x2) / 2
-            mid_h = (h1 + h2) / 2
+            u = 0.5
+            v = 1 - u
+            mid_x = u * x1 + v * x2
+            mid_h = u * h1 + v * h2
             bpy.ops.object.text_add(location=(mid_x, s, mid_h), rotation=(HALF_PI, 0, HALF_PI))
             bpy.context.object.name = f"start_{id}"
             bpy.context.object.data.body = str(edge.start)

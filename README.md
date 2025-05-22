@@ -1,7 +1,7 @@
 # arg-needle-lib-blender
 
-Blender output to help diagnose ARGs. This is an aid to diagnosis whilst adding
-new features, in particular support for polytomy in arg-needle-lib.
+Blender output to help visualise ARG internals. This is diagnosis aid whilst
+adding new features, in particular support for polytomy in arg-needle-lib.
 
 ## Usage
 
@@ -13,11 +13,12 @@ python example.py && open example.blend
 ```
 
 Example screenshot of internals of ARG. Nodes in an arg can contain many spans
-of edges, so to display this they are shown - somewhat counterintuitively - as
-lines in green. The ARG's edges to other nodes span subregions between nodes
-so these are the rectangles shown from blue to red depending on node ID.
+of edges. To render this they are shown - somewhat counterintuitively for
+nodes - as lines, with samples in blue and internal nodes in green. Edges span
+subregions between start and end range along nodes so these are rendered as
+rectangles, blue at base shifting to red for higher node IDs.
 
 ![screenshot](screenshot.png)
 
-The selection in Blender here shows three different edge spans coming off one
-node.
+The selection in Blender here shows four overlapping edge spans coming off one
+node. Text can be disabled in code by setting `SHOW_TEXT` to False.
