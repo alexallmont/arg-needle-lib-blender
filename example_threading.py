@@ -9,9 +9,7 @@ import bpy
 
 from arg_to_blender import ArgToBlender
 from pathlib import Path
-from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw
+from PIL import Image, ImageDraw, ImageEnhance, ImageFont, ImageOps
 
 from dataclasses import dataclass
 
@@ -51,6 +49,7 @@ threading_examples = [
 ]
 
 for ex in threading_examples:
+    frames = []
 
     # Show ARG as if each operation added per frame
     for num_ops in range(len(ex.ops)):
@@ -84,9 +83,28 @@ for ex in threading_examples:
             camera_look_at=(0, 9, 3)
         )
 
-        # Overlay source code
-        img = Image.open(filename)
-        draw = ImageDraw.Draw(img)
-        text_pos = (img.width - 300, img.height - 160)
-        draw.text(text_pos, full_code_text, (127, 127, 127), font=font)
+        # Draw code over ARG image
+        arg_img = Image.open(filename)
+        arg_draw = ImageDraw.Draw(arg_img)
+        text_pos = (arg_img.width - 300, arg_img.height - 160)
+        arg_draw.text(text_pos, full_code_text, (127, 127, 127), font=font)
+
+        # Compositve over black background and boost contrast
+        bg_img = arg_img.copy()
+        bg_draw = ImageDraw.Draw(bg_img)
+        bg_draw.rectangle([(0, 0), bg_img.size], (0, 0, 0))
+        img = Image.alpha_composite(bg_img, arg_img)
+        enhancer = ImageEnhance.Contrast(img.convert('RGB'))
+        img = enhancer.enhance(2)
+
+        frames.append(img)
         img.save(filename)
+
+    # Save animated GIF
+    frames[0].save(
+        f"example_out/threading_{ex.name}.gif",
+        save_all=True,
+        append_images=frames[1:],
+        duration=1000,
+        loop=0
+    )

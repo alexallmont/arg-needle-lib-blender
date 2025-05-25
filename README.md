@@ -24,17 +24,6 @@ The `ArgToBlender` class processes the ARG and attempts to scale and position th
 
 ## Animated threading
 
-You can override the camera position and target which is useful when rendering an ARG changing over time. The `example_threading.py` does this to generate a series of images for particular threading cases. These can be converted to an animated gif using [ImageMagick](https://github.com/ImageMagick/ImageMagick), for example:
-
-```sh
-convert \
-    -delay 120 \
-    -loop 0 \
-    -dispose background \
-    -alpha remove \
-    -background black \
-    example_out/threading_simple*.png \
-    images/threading_simple.gif
-```
+You can override the camera position and target which is useful when rendering an ARG changing over time. The `example_threading.py` does this to generate a series of images for particular threading cases, which are collated into an animated gif:
 
 ![screenshot](images/animated_threading.gif)
