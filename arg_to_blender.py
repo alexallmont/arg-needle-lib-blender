@@ -13,16 +13,18 @@ class ArgToBlender:
     def __init__(
         self,
         arg_render_info: ArgRenderInfo,
-        render_scale: RenderScale,
+        render_scale = None,
         png_out_file = None,
         blender_out_file = None,
         render_text = True,
         render_breakpoints = True,
         text_scale = 0.5,
-        camera_location = None,
-        camera_look_at = None
+        camera_location=(-12, -8, 8),
+        camera_look_at=(-2, 6, 3)
     ):
         self.render_info = arg_render_info
+        if not render_scale:
+            render_scale = RenderScale(arg_render_info)
         self.render_scale = render_scale
 
         self._clear_default_scene_objects()

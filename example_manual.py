@@ -3,7 +3,7 @@ Example of manually-built ARG render
 """
 import bpy
 
-from arg_render_info import ArgRenderInfo, RenderScale
+from arg_render_info import ArgRenderInfo
 from arg_to_blender import ArgToBlender
 from pathlib import Path
 
@@ -27,12 +27,8 @@ ri.add_node(3, 0, 0, 10)
 ri.add_edge(2, 3, 1, 3)
 ri.add_edge(2, 0, 2, 4)
 
-rs = RenderScale(ri)
 ArgToBlender(
     arg_render_info=ri,
-    render_scale=rs,
-    png_out_file="out/manual/polytomy.png",
-    camera_location=(-12, -8, 8),
-    camera_look_at=(-2, 6, 3)
+    png_out_file="out/manual/polytomy.png"
 )
 

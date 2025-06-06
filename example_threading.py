@@ -7,7 +7,7 @@ of ARG and overlaying code at each stage.
 import arg_needle_lib
 import bpy
 
-from arg_render_info import ArgRenderInfo, RenderScale
+from arg_render_info import ArgRenderInfo
 from arg_to_blender import ArgToBlender
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageEnhance, ImageFont
@@ -112,13 +112,9 @@ for tex in threading_examples:
         filename = f"{dirname}/{frame_idx:03}.png"
         #ri = ArgRenderInfo(arg, True)
         ri = ArgRenderInfo(arg, False)
-        rs = RenderScale(ri)
         ArgToBlender(
             arg_render_info=ri,
-            render_scale=rs,
-            png_out_file=filename,
-            camera_location=(-12, -8, 8),
-            camera_look_at=(-2, 6, 3)
+            png_out_file=filename
         )
 
         # Draw code over ARG image
