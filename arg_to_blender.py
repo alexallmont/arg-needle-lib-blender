@@ -84,11 +84,8 @@ class ArgToBlender:
             self._add_line(obj_name, 0.05, mat, x, s, h, x, e, h)
 
             if render_text:
-                # FIXME set to zero for WIP viz, was previously s and h
-                text_height = h # 0
-                text_s = s # s - text_scale # 0
                 bpy.ops.object.text_add(
-                    location=(x, text_s - 0.1, text_height - 0.5),
+                    location=(x, s - 0.1, h - 0.5),
                     rotation=(HALF_PI, 0, 0),
                     radius=text_scale
                 )
@@ -151,7 +148,6 @@ class ArgToBlender:
             bpy.context.object.data.materials.append(self.mat_breakpoint)
 
     def _create_camera(self, camera_location, camera_look_at):
-        ri = self.render_info
         rs = self.render_scale
 
         cam = bpy.data.cameras.new("Camera")
