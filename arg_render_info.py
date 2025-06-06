@@ -11,10 +11,9 @@ class NodeRenderInfo:
     """
     id: int
     height: float
-    y_start: float
-    y_end: float
+    start: float
+    end: float
     x_pos: float
-    colour: tuple
     depth: int
 
     def __hash__(self):
@@ -33,13 +32,12 @@ class EdgeRenderInfo:
     """
     parent_id: int
     child_id: int
-    y_start: float
-    y_end: float
-    colour: tuple
+    start: float
+    end: float
 
     def __hash__(self):
         ID_SCALE = 2 ** 32
-        return hash(self.child_id * ID_SCALE + self.y_start)
+        return hash(self.child_id * ID_SCALE + self.start)
 
 
 class ArgRenderInfo:
@@ -56,27 +54,25 @@ class ArgRenderInfo:
         self._clear_maps()
         self.dirty = True
 
-    def add_node(self, id: int, height: float, y_start: float, y_end: float):
+    def add_node(self, id: int, height: float, start: float, end: float):
         node = NodeRenderInfo(
             id,
             height,
-            y_start,
-            y_end,
+            start,
+            end,
             id, # Use sample ID as first approximation of x position
-            None,
             None
         )
         self.nodes.append(node)
         self.dirty = True
         return node
 
-    def add_edge(self, parent_id: int, child_id: int, y_start: float, y_end: float):
+    def add_edge(self, parent_id: int, child_id: int, start: float, end: float):
         edge = EdgeRenderInfo(
             parent_id,
             child_id,
-            y_start,
-            y_end,
-            None
+            start,
+            end
         )
         self.edges.append(edge)
         self.dirty = True
@@ -144,8 +140,8 @@ class ArgRenderInfo:
             ).add(edge)
 
             # Fast lookup of all breakpoints from edge
-            self.breakpoint_positions.add(edge.y_start)
-            self.breakpoint_positions.add(edge.y_end)
+            self.breakpoint_positions.add(edge.start)
+            self.breakpoint_positions.add(edge.end)
 
         if validate:
             # Check all ids used
@@ -249,8 +245,11 @@ class ArgRenderInfo:
         for index_pos, node in enumerate(x_sorted_nodes):
             node.x_pos = index_pos
 
-# FIXME remove ArgRenderScale derivation; it can be rolled directly into this class
 class RenderScale:
+    def __init__(self, render_info: ArgRenderInfo, global_scale: float=10):
+        render_info.update()
+        self._compute_scale(render_info, global_scale)
+
     def scale_xhl(self, x, h, len):
         x = self.scale_x(x)
         h = self.scale_h(h)
@@ -261,23 +260,6 @@ class RenderScale:
         x = self.scale_x(x)
         h = self.scale_h(h)
         return x, h
-
-    def scale_x(self, x):
-        return x
-
-    def scale_h(self, h):
-        return h
-
-    def scale_len(self, len):
-        return len
-
-
-class ArgRenderScale(RenderScale):
-    def __init__(self, render_info: ArgRenderInfo, global_scale: float=10):
-        # Update render info in case anything changed
-        render_info.update()
-
-        self._compute_scale(render_info, global_scale)
 
     def scale_x(self, x):
         return (x - self.max_width / 2) * self.x_scale
@@ -293,7 +275,7 @@ class ArgRenderScale(RenderScale):
         max_len = 0
         for node in render_info.nodes:
             max_height = max(max_height, node.height)
-            max_len = max(max_len, node.y_end)
+            max_len = max(max_len, node.end)
 
         self.max_height = max_height
         self.max_len = max_len

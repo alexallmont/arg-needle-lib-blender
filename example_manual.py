@@ -3,7 +3,7 @@ Example of manually-built ARG render
 """
 import bpy
 
-from arg_render_info import ArgRenderInfo, ArgRenderScale
+from arg_render_info import ArgRenderInfo, RenderScale
 from arg_to_blender import ArgToBlender
 from pathlib import Path
 
@@ -26,7 +26,7 @@ ri.add_node(3, 0, 0, 10)
 ri.add_edge(2, 3, 1, 2)
 ri.add_edge(2, 3, 1, 2)
 
-rs = ArgRenderScale(ri)
+rs = RenderScale(ri)
 ArgToBlender(
     arg_render_info=ri,
     render_scale=rs,

@@ -72,8 +72,8 @@ class ArgToBlender:
         for node in ri.nodes:
             obj_name = f"node_{node.id}"
             x, h = rs.scale_xh(node.x_pos, node.height)
-            s = rs.scale_len(node.y_start)
-            e = rs.scale_len(node.y_end)
+            s = rs.scale_len(node.start)
+            e = rs.scale_len(node.end)
 
             if ri.node_is_leaf(node):
                 mat = self.mat_leaf_node
@@ -110,8 +110,8 @@ class ArgToBlender:
             parent = ri.node_by_id[edge.parent_id]
             x1, h1 = rs.scale_xh(node.x_pos, node.height)
             x2, h2 = rs.scale_xh(parent.x_pos, parent.height)
-            s = rs.scale_len(edge.y_start)
-            e = rs.scale_len(edge.y_end)
+            s = rs.scale_len(edge.start)
+            e = rs.scale_len(edge.end)
             vtx = [
                 (x1, s, h1),
                 (x1, e, h1),
