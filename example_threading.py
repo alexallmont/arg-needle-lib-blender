@@ -21,7 +21,7 @@ class ThreadingOps:
     end:   float
     thread_sample_args: list # Arguments passed to arg.thread_sample()
 
-Path("example_out").mkdir(exist_ok=True)
+Path("out/anims").mkdir(exist_ok=True, parents=True)
 
 # Fix render output resolution for consistent results
 bpy.context.scene.render.resolution_x = 800
@@ -32,15 +32,55 @@ font = ImageFont.load_default(12)
 
 # Example threading operations
 threading_examples = [
-    ThreadingOps("simple", 0, 100, [
-        ([0, 60], [0, 0], [1, 2]),
-        ([0], [0], [3]),
+    ThreadingOps("minimal-00-base", 0, 10, [
+        ([0, 6], [0, 0], [2, 4])
     ]),
-    ThreadingOps("broken_polytomy", 0, 100, [
+    ThreadingOps("minimal-01-span-all-lower", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 4], [1, 1], [1, 1])
+    ]),
+    ThreadingOps("minimal-02-span-all-between", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 4], [1, 1], [3, 3])
+    ]),
+    ThreadingOps("minimal-03-span-all-higher", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 4], [1, 1], [5, 5])
+    ]),
+    ThreadingOps("minimal-04-span-inside-lower", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 1, 5], [1, 1, 1], [6, 1, 6])
+    ]),
+    ThreadingOps("minimal-05-span-inside-higher", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 1, 5], [1, 1, 1], [6, 5, 6])
+    ]),
+    ThreadingOps("minimal-06-span-inside-higher-sample-0-same", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 1, 5], [0, 0, 0], [6, 5, 6])
+    ]),
+    ThreadingOps("minimal-07-span-inside-sample-0-inject-under", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 1, 5], [1, 1, 1], [6, 5, 6]),
+        ([0, 2, 4], [0, 0, 0], [7, 0.5, 7])
+    ]),
+    ThreadingOps("minimal-08-span-inside-sample-1-inject-under", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 1, 5], [1, 1, 1], [6, 5, 6]),
+        ([0, 2, 4], [1, 1, 1], [7, 0.5, 7])
+    ]),
+    ThreadingOps("minimal-09-span-inside-under-over", 0, 10, [
+        ([0, 6], [0, 0], [2, 4]),
+        ([0, 1, 5], [1, 1, 1], [6, 5, 6]),
+        ([0, 2, 3, 4], [1, 1, 1, 1], [7, 0.5, 2.5, 7])
+    ]),
+
+    ThreadingOps("broken-polytomy", 0, 100, [
         ([0, 20, 80], [0, 0, 0], [3, 4, 3]),
         ([0, 70, 80], [0, 1, 1], [6, 6, 6]),
     ]),
-    ThreadingOps("output-50-10-80000", 0, 80000, [
+
+    ThreadingOps("msprime-50-10-80000", 0, 80000, [
         ([0, 2080, 7084, 9789, 11545, 15016, 17095, 19419, 20941, 23306, 25067, 27104, 28782, 30253, 32815, 34801, 37361, 40562, 41746, 45551, 54218, 55287, 57900, 59685, 62508, 66830, 73460, 75727], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], [10718.618962907021, 4287.134251627941, 15599.740536576062, 12892.15411736792, 11687.615184347811, 20588.900739646706, 40260.17092018282, 37596.219219486309, 26297.077393787757, 24103.30372557517, 21006.575743898084, 34938.80831984539, 28166.262054796731, 8495.0769461326308, 11279.910227356229, 8502.2568424007586, 12863.479293774855, 19088.829436018921, 5552.7651544700575, 2860.9861217558168, 20903.891014173041, 8310.3842842058912, 12668.011742100914, 7627.0297670856462, 4900.6741823746397, 3421.8904058412995, 9739.6963716304235, 23501.096674691464]),
         ([0, 2080, 11545, 30253, 45551, 62508, 66830], [1, 1, 1, 0, 1, 1, 1], [36907.231813543192, 16667.820674772189, 1921.1028043691995, 8571.5781853834269, 5105.7224025381347, 4900.5179465874135, 3727.3676795632632]),
         ([0, 11545], [2, 1], [4490.9246369849961, 876.34155993398133]),
@@ -57,6 +97,8 @@ threading_examples = [
 
 for tex in threading_examples:
     frames = []
+    code_lines = []
+
     def generate_frame():
         frame_idx = len(frames) + 1
         print(f"Frame {frame_idx}")
@@ -66,27 +108,29 @@ for tex in threading_examples:
         print()
 
         # Render using Blender
-        filename = f"example_out/threading_{tex.name}_{frame_idx}.png"
+        dirname = f"out/{tex.name}"
+        filename = f"{dirname}/{frame_idx:03}.png"
+        #ri = ArgRenderInfo(arg, True)
         ri = ArgRenderInfo(arg, False)
         rs = ArgRenderScale(ri)
         ArgToBlender(
             arg_render_info=ri,
             render_scale=rs,
             png_out_file=filename,
-            camera_location=(17, -5, 8),
-            camera_look_at=(0, 9, 3)
+            camera_location=(-12, -8, 8),
+            camera_look_at=(-2, 6, 3)
         )
 
         # Draw code over ARG image
         arg_img = Image.open(filename)
         arg_draw = ImageDraw.Draw(arg_img)
-        text_pos = (arg_img.width - 300, arg_img.height - 160)
-        arg_draw.text(text_pos, full_code_text, (127, 127, 127), font=font)
+        text_pos = (60, arg_img.height - 160)
+        arg_draw.text(text_pos, full_code_text, (0, 0, 0), font=font)
 
         # Compositve over black background and boost contrast
         bg_img = arg_img.copy()
         bg_draw = ImageDraw.Draw(bg_img)
-        bg_draw.rectangle([(0, 0), bg_img.size], (0, 0, 0))
+        bg_draw.rectangle([(0, 0), bg_img.size], (255, 255, 255))
         img = Image.alpha_composite(bg_img, arg_img)
         enhancer = ImageEnhance.Contrast(img.convert('RGB'))
         img = enhancer.enhance(1.5)
@@ -116,9 +160,8 @@ for tex in threading_examples:
 
     # Save animated GIF
     frames[0].save(
-        f"example_out/threading_{tex.name}.gif",
+        f"out/anims/{tex.name}.gif",
         save_all=True,
         append_images=frames[1:],
-        duration=1000,
-        loop=0
+        duration=1000
     )

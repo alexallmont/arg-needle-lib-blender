@@ -54,6 +54,7 @@ class ArgRenderInfo:
         self.nodes = []
         self.edges = []
         self._clear_maps()
+        self.dirty = True
 
     def add_node(self, id: int, height: float, y_start: float, y_end: float):
         node = NodeRenderInfo(
@@ -61,11 +62,12 @@ class ArgRenderInfo:
             height,
             y_start,
             y_end,
-            None,
+            id, # Use sample ID as first approximation of x position
             None,
             None
         )
         self.nodes.append(node)
+        self.dirty = True
         return node
 
     def add_edge(self, parent_id: int, child_id: int, y_start: float, y_end: float):
@@ -77,6 +79,7 @@ class ArgRenderInfo:
             None
         )
         self.edges.append(edge)
+        self.dirty = True
         return edge
 
     def build_from_arg(self, arg):
@@ -91,50 +94,84 @@ class ArgRenderInfo:
                 arg_node.start,
                 arg_node.end
             )
-            self.node_by_id[node_id] = node
 
-            # Quick lookup of leaf (sample) and interior nodes
-            if arg.is_leaf(node_id):
-                # Use sample id as first approximation of position
-                node.x_pos = node_id
-                self.leaf_nodes.add(node)
-            else:
-                self.interior_nodes.add(node)
+            # For arg-needle-lib, use id as first approximation of position
+            node.x_pos = node_id
 
-            # Create any associated edges, breakpoints and root nodes
-            parent_edges = arg_node.parent_edges()
-            if parent_edges:
-                for arg_edge in parent_edges:
-                    edge = self.add_edge(
-                        arg_edge.parent.ID,
-                        node_id,
-                        arg_edge.start,
-                        arg_edge.end
-                    )
+            # Create any associated edges
+            for arg_edge in arg_node.parent_edges():
+                self.add_edge(
+                    arg_edge.parent.ID,
+                    node_id,
+                    arg_edge.start,
+                    arg_edge.end
+                )
 
-                    # Fast lookup of all edges for a given node
-                    self.edges_by_child_node_id.setdefault(
-                        node_id,
-                        set()
-                    ).add(edge)
+        self.update(False)
 
-                    self.breakpoint_positions.add(arg_edge.start)
-                    self.breakpoint_positions.add(arg_edge.end)
-            else:
-                self.root_nodes.add(node)
+    def update(self, validate=False):
+        """
+        Build internal lookup maps from nodes and edges. Validate checks that
+        ARG is fully-connected but can be left off whilst it's still being
+        constructed, e.g. debug rendering during threading.
+        """
+        if not self.dirty:
+            return
 
-        self._compute_x_pos_and_depth()
-
-    def rebuild_maps(self):
         self._clear_maps()
-        # FIXME need to replicate build_from_arg behaviour for manual nodes
-        # Note for each edge, need to check
-        # assert(parent_id < len(self.nodes))
-        # assert(child_id < len(self.nodes))
+
+        # Make a fast node lookup dict
+        for node in self.nodes:
+            self.node_by_id[node.id] = node
+
+        # Collate used nodes during edge traversal
+        all_node_ids = set([node.id for node in self.nodes])
+        used_parent_ids = set()
+        used_child_ids = set()
+
+        for edge in self.edges:
+            if validate:
+                assert edge.parent_id in all_node_ids
+                assert edge.child_id in all_node_ids
+
+            used_parent_ids.add(edge.parent_id)
+            used_child_ids.add(edge.child_id)
+
+            # Fast lookup of all edges for a given node
+            self.edges_by_child_node_id.setdefault(
+                edge.child_id,
+                set()
+            ).add(edge)
+
+            # Fast lookup of all breakpoints from edge
+            self.breakpoint_positions.add(edge.y_start)
+            self.breakpoint_positions.add(edge.y_end)
+
+        if validate:
+            # Check all ids used
+            all_processed_ids = used_parent_ids | used_child_ids
+            assert all_processed_ids == all_node_ids
+
+        # Intersection and differences of ids informs basic leaf/root/internal
+        leaf_ids = all_node_ids - used_parent_ids
+        root_ids = used_parent_ids - used_child_ids - leaf_ids
+        interior_ids = all_node_ids - leaf_ids - root_ids
+
+        self.leaf_nodes = set([self.node_by_id[id] for id in leaf_ids])
+        self.root_nodes = set([self.node_by_id[id] for id in root_ids])
+        self.interior_nodes = set([self.node_by_id[id] for id in interior_ids])
+
         self._compute_x_pos_and_depth()
+        self.dirty = False
 
     def node_is_leaf(self, node):
         return node in self.leaf_nodes
+
+    def node_is_root(self, node):
+        return node in self.root_nodes
+
+    def node_is_interior(self, node):
+        return node in self.interior_nodes
 
     def _clear_maps(self):
         self.node_by_id = {}
@@ -180,13 +217,14 @@ class ArgRenderInfo:
                 []
             ).append(node)
 
-        if self.nodes_by_depth:
-            # If the leaf node x positions have not been set - i.e. when working
-            # with manually-built structure not via build_from_arg - then set an
-            # arbitrary x pos for each.
-            if any([node.x_pos == None for node in self.nodes_by_depth[0]]):
-                for new_id, node in enumerate(self.nodes_by_depth[0]):
-                    node.x_pos = new_id
+        if self.edges:
+            if self.nodes_by_depth:
+                # If the leaf node x positions have not been set - i.e. when working
+                # with manually-built structure not via build_from_arg - then set an
+                # arbitrary x pos for each.
+                if any([node.x_pos == None for node in self.nodes_by_depth[0]]):
+                    for new_id, node in enumerate(self.nodes_by_depth[0]):
+                        node.x_pos = new_id
 
             # Ascend up compute stack to set each node's position as average of
             # contributors, i.e. ensure any parent (higher) nodes are rendered
@@ -198,15 +236,18 @@ class ArgRenderInfo:
                     avg = sum(contribs_x_pos) / len(contribs)
                     node.x_pos = avg
 
-        # Quantise the locations so they are not fractional. For example, given
-        # a minimal 3 node graph with leaves at 0 and 1, their parent would be
-        # 0.5 by default. Quantise instead uses x_pos as sort order and then
-        # places at sort index, so leaves at 0 and 2 with parent inbetween at 1.
+        # Optionally quantise locations so they are not fractional. For example,
+        # a minimal 3 node graph with leaves at 0 and 1, would have parent at
+        # 0.5. Quantise instead uses x_pos as sort order and then places at sort
+        # index, so leaves at 0 and 2 with parent inbetween at 1.
         if self.quantise:
-            x_sorted_nodes = [node for node in self.nodes]
-            x_sorted_nodes.sort(key=lambda node: node.x_pos)
-            for index_pos, node in enumerate(x_sorted_nodes):
-                node.x_pos = index_pos
+            x_sorted_nodes = self.nodes.copy()
+        else:
+            # When not quantising all, just re-sort leaf nodes
+            x_sorted_nodes = list(self.leaf_nodes)
+        x_sorted_nodes.sort(key=lambda node: node.x_pos)
+        for index_pos, node in enumerate(x_sorted_nodes):
+            node.x_pos = index_pos
 
 # FIXME remove ArgRenderScale derivation; it can be rolled directly into this class
 class RenderScale:
@@ -232,7 +273,10 @@ class RenderScale:
 
 
 class ArgRenderScale(RenderScale):
-    def __init__(self, render_info, global_scale=10):
+    def __init__(self, render_info: ArgRenderInfo, global_scale: float=10):
+        # Update render info in case anything changed
+        render_info.update()
+
         self._compute_scale(render_info, global_scale)
 
     def scale_x(self, x):
@@ -253,7 +297,7 @@ class ArgRenderScale(RenderScale):
 
         self.max_height = max_height
         self.max_len = max_len
-        self.max_width = len(render_info.leaf_nodes) - 1
+        self.max_width = max([node.x_pos for node in render_info.leaf_nodes])
 
         self.x_scale = global_scale / (self.max_width + 1)
         self.height_scale = global_scale / (self.max_height + 1)

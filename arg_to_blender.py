@@ -17,7 +17,7 @@ class ArgToBlender:
         png_out_file = None,
         blender_out_file = None,
         render_text = True,
-        render_breakpoints = False,
+        render_breakpoints = True,
         text_scale = 0.5,
         camera_location = None,
         camera_look_at = None
@@ -26,12 +26,12 @@ class ArgToBlender:
         self.render_scale = render_scale
 
         self._clear_default_scene_objects()
+        self._create_materials()
         self._add_nodes_to_scene(render_text, text_scale)
         self._add_edges_to_scene()
 
-        # FIXME reinstate breakpoint rendering
-        # if render_breakpoints:
-        #     self._add_breakpoints_to_scene(render_text, text_scale)
+        if render_text and render_breakpoints:
+            self._add_breakpoints_text_to_scene(text_scale)
 
         self._create_camera(camera_location, camera_look_at)
         if blender_out_file:
@@ -39,6 +39,31 @@ class ArgToBlender:
 
         if png_out_file:
             self._save_render_image(png_out_file)
+
+    def _create_materials(self):
+        self.mat_leaf_node = self._create_material_diffuse("leaf", 0.2, 0.2, 1, 1)
+        self.mat_root_node = self._create_material_diffuse("root", 1, 0.2, 0.2, 1)
+        self.mat_internal_node = self._create_material_diffuse("internal", 0.2, 1, 0.2, 1)
+        self.mat_edge = self._create_material_diffuse("edge", 1, 1, 1, 0.1)
+        self.mat_outline = self._create_material_diffuse("outline", 0, 0, 0, 0.5)
+        self.mat_breakpoint = self._create_material_diffuse("breakpoint", 0.5, 0.5, 0.5, 1)
+
+    def _add_line(self, obj_name, radius, mat, x1, y1, z1, x2, y2, z2):
+        line_point_list = ((x1, y1, z1, 0), (x2, y2, z2, 0))
+        curvedata = bpy.data.curves.new(name=obj_name, type='CURVE')
+        curvedata.dimensions = '3D'
+
+        obj = bpy.data.objects.new(obj_name, curvedata)
+        bpy.context.scene.collection.objects.link(obj)
+
+        # add the points for the line
+        polyline = curvedata.splines.new('POLY')
+        polyline.points.add(len(line_point_list) - 1)
+        for p, co in zip(polyline.points, line_point_list):
+            p.co = co
+
+        curvedata.materials.append(mat)
+        curvedata.bevel_depth = radius
 
     def _add_nodes_to_scene(self, render_text, text_scale):
         ri = self.render_info
@@ -50,32 +75,31 @@ class ArgToBlender:
             s = rs.scale_len(node.y_start)
             e = rs.scale_len(node.y_end)
 
-            line_point_list = ((x, s, h, 0), (x, e, h, 0))
-            curvedata = bpy.data.curves.new(name=obj_name, type='CURVE')
-            curvedata.dimensions = '3D'
-
-            obj = bpy.data.objects.new(obj_name, curvedata)
-            bpy.context.scene.collection.objects.link(obj)
-
-            # add the points for the line
-            polyline = curvedata.splines.new('POLY')
-            polyline.points.add(len(line_point_list) - 1)
-            for p, co in zip(polyline.points, line_point_list):
-                p.co = co
-
-            node_colour = SAMPLE_COLOUR if ri.node_is_leaf(node) else NODE_COLOUR
-            mat = self._create_flat_color_transparent_material(obj_name, node_colour)
-            curvedata.materials.append(mat)
-            curvedata.bevel_depth = 0.05
+            if ri.node_is_leaf(node):
+                mat = self.mat_leaf_node
+            elif ri.node_is_root(node):
+                mat = self.mat_root_node
+            else:
+                mat = self.mat_internal_node
+            self._add_line(obj_name, 0.05, mat, x, s, h, x, e, h)
 
             if render_text:
-                bpy.ops.object.text_add(location=(x, s - text_scale, h), rotation=(0, 0, 0), radius=text_scale)
+                # FIXME set to zero for WIP viz, was previously s and h
+                text_height = h # 0
+                text_s = s # s - text_scale # 0
+                bpy.ops.object.text_add(
+                    location=(x, text_s - 0.1, text_height - 0.5),
+                    rotation=(HALF_PI, 0, 0),
+                    radius=text_scale
+                )
                 bpy.context.object.name = f"id_{node.id}"
                 bpy.context.object.data.body = f"{node.id}"
+                bpy.context.object.data.materials.append(mat)
 
-                bpy.ops.object.text_add(location=(x, e + text_scale, h), rotation=(0, 0, 0), radius=text_scale)
-                bpy.context.object.name = f"height_{node.id}"
-                bpy.context.object.data.body = f"{node.height:.3f}"
+                # FIXME reinstate optional height rendering
+                # bpy.ops.object.text_add(location=(x, e + text_scale, h), rotation=(0, 0, 0), radius=text_scale)
+                # bpy.context.object.name = f"height_{node.id}"
+                # bpy.context.object.data.body = f"{node.height:.3f}"
 
     def _add_edges_to_scene(self):
         ri = self.render_info
@@ -105,43 +129,26 @@ class ArgToBlender:
             obj = bpy.data.objects.new(obj_name, mesh)
             bpy.context.scene.collection.objects.link(obj)
 
-            edge_colour = [EDGE_COLOUR[i] for i in range(4)]
-            edge_colour[0] += node.height / rs.max_height
-            mat = self._create_flat_color_transparent_material(obj_name, edge_colour)
+            mat = self.mat_edge
             obj.data.materials.append(mat)
 
-    def _add_breakpoints_to_scene(self, render_text, text_scale):
+            self._add_line(obj_name, 0.01, self.mat_outline, x1, s, h1, x2, s, h2)
+            self._add_line(obj_name, 0.01, self.mat_outline, x1, e, h1, x2, e, h2)
+
+    def _add_breakpoints_text_to_scene(self, text_scale):
         ri = self.render_info
-        scale = 1.1
-        x1, h1 = ri.scale_x_h((ri.max_width * (1 - scale), ri.max_height * (1 - scale)))
-        x2, h2 = ri.scale_x_h((ri.max_width * scale, ri.max_height * scale))
-        b = breakpoint * ri.len_scale
+        rs = self.render_scale
+        for breakpoint in ri.breakpoint_positions:
+            x, h, l = rs.scale_xhl(0, 0, breakpoint)
 
-        vtx = [
-            (x1, b, h1),
-            (x2, b, h1),
-            (x2, b, h2),
-            (x1, b, h2),
-        ]
-        faces = [
-            (0, 1, 2),
-            (2, 3, 0),
-        ]
-
-        obj_name = f"breakpoint_{breakpoint}"
-        mesh = bpy.data.meshes.new(f"{obj_name}_mesh")
-        mesh.from_pydata(vtx, [], faces)
-        mesh.update()
-        obj = bpy.data.objects.new(obj_name, mesh)
-        bpy.context.scene.collection.objects.link(obj)
-
-        mat = self._create_flat_color_transparent_material(obj_name, (1, 0, 0, 0.05), 0.05)
-        obj.data.materials.append(mat)
-
-        if render_text:
-            bpy.ops.object.text_add(location=(x2, b, h1 + text_scale), rotation=(HALF_PI, 0, HALF_PI), radius=text_scale)
+            bpy.ops.object.text_add(
+                location=(x - 0.2, l + 0.5, h - 0.5),
+                rotation=(HALF_PI, 0, -HALF_PI),
+                radius=text_scale
+            )
             bpy.context.object.name = f"breakpoint_text_{breakpoint}"
             bpy.context.object.data.body = str(breakpoint)
+            bpy.context.object.data.materials.append(self.mat_breakpoint)
 
     def _create_camera(self, camera_location, camera_look_at):
         ri = self.render_info
@@ -191,25 +198,24 @@ class ArgToBlender:
         bpy.ops.object.delete()
 
     @staticmethod
-    def _create_flat_color_transparent_material(name, color_rgba, alpha=0.2):
+    def _create_material_diffuse(name, r, g, b, a):
         mat = bpy.data.materials.new(name=name)
         mat.use_nodes = True
         mat.blend_method = 'BLEND'
-        mat.diffuse_color = color_rgba
+        mat.diffuse_color = (r, g, b, 1)
         nodes = mat.node_tree.nodes
         links = mat.node_tree.links
-        nodes.clear()
 
-        # Nodes
+        nodes.clear()
         emission = nodes.new("ShaderNodeEmission")
         transparent = nodes.new("ShaderNodeBsdfTransparent")
         mix = nodes.new("ShaderNodeMixShader")
         output = nodes.new("ShaderNodeOutputMaterial")
 
         # Set color and alpha
-        emission.inputs["Color"].default_value = color_rgba
+        emission.inputs["Color"].default_value = (r, g, b, 1)
         emission.inputs["Strength"].default_value = 1.0
-        mix.inputs["Fac"].default_value = alpha
+        mix.inputs["Fac"].default_value = a
 
         # Connect
         links.new(transparent.outputs["BSDF"], mix.inputs[1])
