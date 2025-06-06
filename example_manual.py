@@ -15,22 +15,23 @@ bpy.context.scene.render.resolution_y = 600
 
 ri = ArgRenderInfo()
 
-# Polytomy: add one  start
+# Baseline: add two samples and internal node, and partially connect
 ri.add_node(0, 0, 0, 10)
 ri.add_node(1, 0, 0, 10)
 ri.add_node(2, 3, 1, 8)
 ri.add_edge(2, 1, 1, 5)
 ri.add_edge(2, 0, 5, 8)
 
+# Minimal polytomy: edges fit inside existing node, so can reuse with no split
 ri.add_node(3, 0, 0, 10)
-ri.add_edge(2, 3, 1, 2)
-ri.add_edge(2, 3, 1, 2)
+ri.add_edge(2, 3, 1, 3)
+ri.add_edge(2, 0, 2, 4)
 
 rs = RenderScale(ri)
 ArgToBlender(
     arg_render_info=ri,
     render_scale=rs,
-    png_out_file="out/manual/test.png",
+    png_out_file="out/manual/polytomy.png",
     camera_location=(-12, -8, 8),
     camera_look_at=(-2, 6, 3)
 )
